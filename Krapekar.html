@@ -1,0 +1,166 @@
+<!DOCTYPE html><html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kaprekar Game</title>
+  <style>
+    body {font-family: Arial, sans-serif; background: black; color: white; display:flex; justify-content:center; align-items:center; height:100vh; margin:0;}
+    .container {text-align:center; width:320px;}
+    h1 {margin-bottom:20px;}
+    .number {margin-bottom:20px; font-size:24px; letter-spacing:5px;}
+    .label {margin:10px 0; font-size:16px;}
+    .row {display:flex; justify-content:center; gap:10px; margin-bottom:16px;}
+    .box {width:50px; height:50px; background:#ddd; border:none; text-align:center; font-size:22px; border-radius:6px;}
+    .box:focus {outline:2px solid #38bdf8;}
+    .line {border-top:2px solid white; margin:16px 0;}
+    .result {font-size:16px; min-height:24px;}
+    .correct {color:#4ade80;} .wrong {color:#f87171;}
+    button {margin-top:8px; padding:10px; width:100%; border:none; border-radius:8px; background:white; color:black; font-weight:bold;}
+    #resetBtn {display:none;}
+    .leaderboard {margin-top:15px; text-align:left; font-size:14px;}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Kaprekar Game</h1>
+    <div class="number" id="randomNumber">0000</div><div class="label">Urutkan dari terbesar ke terkecil</div>
+<div class="row" id="descRow"></div>
+
+<div class="label">Urutkan dari terkecil ke terbesar</div>
+<div class="row" id="ascRow"></div>
+
+<div class="line"></div>
+
+<div class="label">Hasil pengurangan</div>
+<div class="row" id="resRow"></div>
+
+<div class="result" id="status"></div>
+
+<button onclick="checkStep()">Cek</button>
+<button onclick="giveUp()">Menyerah</button>
+<button id="resetBtn" onclick="newGame()">Reset</button>
+
+<div class="leaderboard" id="leaderboard"></div>
+
+  </div>  <script>
+    let currentNumber = "";
+    let correctDesc = "";
+    let correctAsc = "";
+    let correctRes = "";
+    let steps = 0;
+    let startTime = 0;
+
+    function createBoxes(rowId){
+      const row = document.getElementById(rowId);
+      row.innerHTML='';
+      for(let i=0;i<4;i++){
+        const input=document.createElement('input');
+        input.className='box'; input.maxLength=1; input.inputMode='numeric';
+        input.addEventListener('input',()=>{
+          input.value=input.value.replace(/[^0-9]/g,'');
+          if(input.value && input.nextElementSibling) input.nextElementSibling.focus();
+        });
+        input.addEventListener('keydown',(e)=>{
+          if(e.key==='Backspace' && !input.value && input.previousElementSibling){
+            input.previousElementSibling.focus();
+          }
+        });
+        row.appendChild(input);
+      }
+    }
+
+    function generateValidNumber(){
+      let num; do{ num=Math.floor(1000+Math.random()*9000).toString(); }
+      while(new Set(num).size===1);
+      return num;
+    }
+
+    function computeAnswers(){
+      const digits=currentNumber.split('');
+      correctAsc=digits.slice().sort().join('');
+      correctDesc=digits.slice().sort().reverse().join('');
+      correctRes=(parseInt(correctDesc)-parseInt(correctAsc)).toString().padStart(4,'0');
+    }
+
+    function fillNumber(n){ document.getElementById('randomNumber').innerText=n; }
+    function clearAllBoxes(){ document.querySelectorAll('.box').forEach(b=>b.value=''); }
+
+    function newGame(){
+      currentNumber=generateValidNumber();
+      computeAnswers();
+      fillNumber(currentNumber);
+      clearAllBoxes();
+      steps = 0;
+      startTime = Date.now();
+      const s=document.getElementById('status');
+      s.className='result'; s.innerText='Mulai → capai 6174';
+      document.getElementById('resetBtn').style.display='none';
+    }
+
+    function getRowValue(rowId){
+      return Array.from(document.querySelectorAll(`#${rowId} .box`)).map(i=>i.value).join('');
+    }
+
+    function saveScore(resultText){
+      let time = ((Date.now() - startTime)/1000).toFixed(1);
+      let avg = (time / (steps||1)).toFixed(2);
+      let data = JSON.parse(localStorage.getItem('kaprekarScores') || '[]');
+      data.push({steps, time, avg, result: resultText});
+      data = data.slice(-5);
+      localStorage.setItem('kaprekarScores', JSON.stringify(data));
+      renderLeaderboard();
+    }
+
+    function renderLeaderboard(){
+      let data = JSON.parse(localStorage.getItem('kaprekarScores') || '[]');
+      let html = '<b>Leaderboard (lokal)</b><br>';
+      data.forEach(d=>{
+        html += `Langkah: ${d.steps}, Waktu: ${d.time}s, Avg: ${d.avg}s<br>`;
+      });
+      document.getElementById('leaderboard').innerHTML = html;
+    }
+
+    function checkStep(){
+      const userDesc=getRowValue('descRow');
+      const userAsc=getRowValue('ascRow');
+      const userRes=getRowValue('resRow');
+      const s=document.getElementById('status');
+
+      if(userDesc.length<4||userAsc.length<4||userRes.length<4){
+        s.className='result wrong'; s.innerText='Isi semua kotak!'; return;
+      }
+
+      if(userDesc===correctDesc && userAsc===correctAsc && userRes===correctRes){
+        steps++;
+        if(correctRes==='6174'){
+          s.className='result correct';
+          s.innerText=`Selesai! (${steps} langkah)`;
+          saveScore('win');
+          document.getElementById('resetBtn').style.display='block';
+          return;
+        }
+        currentNumber=correctRes;
+        computeAnswers();
+        fillNumber(currentNumber);
+        clearAllBoxes();
+        s.className='result correct'; s.innerText='Benar!';
+      } else {
+        s.className='result wrong'; s.innerText='Salah';
+      }
+    }
+
+    function giveUp(){
+      const s=document.getElementById('status');
+      s.className='result wrong';
+      s.innerText='Menyerah 😅';
+      saveScore('giveup');
+      document.getElementById('resetBtn').style.display='block';
+    }
+
+    createBoxes('descRow');
+    createBoxes('ascRow');
+    createBoxes('resRow');
+    newGame();
+    renderLeaderboard();
+  </script></body>
+</html>
